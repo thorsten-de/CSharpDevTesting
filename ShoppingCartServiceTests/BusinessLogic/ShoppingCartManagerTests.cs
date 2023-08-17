@@ -11,6 +11,7 @@ using ShoppingCartServiceTests.Fakes;
 using static ShoppingCartServiceTests.HelperExtensions;
 using static ShoppingCartServiceTests.Builders.CheckOutDtoBuilder;
 using static ShoppingCartServiceTests.Builders.CouponBuilder;
+using Microsoft.AspNetCore.Authentication;
 
 namespace ShoppingCartServiceTests.BusinessLogic
 {
@@ -32,6 +33,18 @@ namespace ShoppingCartServiceTests.BusinessLogic
             Assert.Equal(100, result.Total);
             Assert.Equal(15, result.CouponDiscount);
             Assert.Equal(85, result.TotalAfterCoupon);
+        }
+
+        [Fact]
+        public void CalculateTotals_WithoutCouponCode_HasNoDiscount()
+        {
+            ShoppingCartManager target = CreateShoppingCartManager(CreateCheckOutDto(total: 100));
+
+            var result = target.CalculateTotals(FakeShoppingCartRepository.VALID_ID);
+            
+            Assert.Equal(100, result.Total);
+            Assert.Equal(0, result.CouponDiscount);
+            Assert.Equal(100, result.TotalAfterCoupon);
         }
 
         private ShoppingCartManager CreateShoppingCartManager(CheckoutDto checkoutDto)
