@@ -21,10 +21,12 @@ namespace ShoppingCartServiceTests.Controllers
         private readonly ShoppingCartDatabaseSettings _databaseSettings;
         private readonly IMapper _mapper;
         private const string Invalid_ID = "507f191e810c19729de860ea";
+        private readonly ICouponRepository _repository;
 
         public CouponsControllerIntegrationTests(DockerMongoFixture fixture)
         {
             _databaseSettings = fixture.GetDatabaseSettings();
+            _repository = new CouponRepository(_databaseSettings);
 
             _mapper = fixture.Mapper;
         }
@@ -38,9 +40,9 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void CreateCoupon_couponCreated()
         {
-            var repository = new CouponRepository(_databaseSettings);
+ //           var repository = new FakeCouponRepository(); //  new CouponRepository(_databaseSettings);
 
-            var target = new CouponController(new CouponManager(repository, _mapper));
+            var target = new CouponController(new CouponManager(_repository, _mapper));
 
             var expiration = DateTime.Now.ToUniversalTime().Date;
             var createCouponDto = new CreateCouponDto(
@@ -54,7 +56,7 @@ namespace ShoppingCartServiceTests.Controllers
             Assert.IsType<CreatedAtRouteResult>(result.Result);
             var couponId = ((CreatedAtRouteResult) result.Result).RouteValues["id"].ToString();
 
-            var actual = repository.FindById(couponId);
+            var actual = _repository.FindById(couponId);
 
             var expected = new Coupon
             {
@@ -70,7 +72,6 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void FindById_HasOneCartWithSameId_returnAllShoppingCartsInformation()
         {
-            var repository = new CouponRepository(_databaseSettings);
 
             var coupon = new Coupon
             {
@@ -78,9 +79,9 @@ namespace ShoppingCartServiceTests.Controllers
                 Value = 10
             };
 
-            repository.Create(coupon);
+            _repository.Create(coupon);
 
-            var target = new CouponController(new CouponManager(repository, _mapper));
+            var target = new CouponController(new CouponManager(_repository, _mapper));
 
             var actual = target.FindById(coupon.Id);
 
@@ -93,9 +94,7 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void FindById_notFound_returnNotFoundResult()
         {
-            var repository = new CouponRepository(_databaseSettings);
-
-            var target = new CouponController(new CouponManager(repository, _mapper));
+            var target = new CouponController(new CouponManager(_repository, _mapper));
 
             var actual = target.FindById(Invalid_ID);
 
@@ -105,17 +104,15 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void Delete_ReturnNoConentAndDeleteItem()
         {
-            var repository = new CouponRepository(_databaseSettings);
-
             var coupon = new Coupon
             {
                 CouponType = CouponType.Percentage,
                 Value = 10
             };
 
-            repository.Create(coupon);
+            _repository.Create(coupon);
 
-            var target = new CouponController(new CouponManager(repository, _mapper));
+            var target = new CouponController(new CouponManager(_repository, _mapper));
 
             var actual = target.DeleteCoupon(coupon.Id);
             Assert.IsType<NoContentResult>(actual);
