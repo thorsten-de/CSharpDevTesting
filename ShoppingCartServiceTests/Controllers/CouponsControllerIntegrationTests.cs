@@ -1,47 +1,28 @@
 ﻿using System;
 using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.OpenApi.Models;
-using MongoDB.Driver;
+using Xunit;
+
 using ShoppingCartService.BusinessLogic;
-using ShoppingCartService.Config;
 using ShoppingCartService.Controllers;
 using ShoppingCartService.Controllers.Models;
 using ShoppingCartService.DataAccess;
 using ShoppingCartService.DataAccess.Entities;
 using ShoppingCartService.Models;
-using ShoppingCartServiceTests.Fixtures;
-using Xunit;
+
+using static ShoppingCartServiceTests.HelperExtensions;
 
 namespace ShoppingCartServiceTests.Controllers
 {
-    [Collection("Dockerized MongoDB collection")]
-    public class CouponsControllerIntegrationTests : IDisposable
+    public class CouponsControllerIntegrationTests 
     {
-        private readonly ShoppingCartDatabaseSettings _databaseSettings;
-        private readonly IMapper _mapper;
+        private readonly IMapper _mapper = ConfigureMapper();
         private const string Invalid_ID = "507f191e810c19729de860ea";
-        private readonly ICouponRepository _repository;
-
-        public CouponsControllerIntegrationTests(DockerMongoFixture fixture)
-        {
-            _databaseSettings = fixture.GetDatabaseSettings();
-            _repository = new CouponRepository(_databaseSettings);
-
-            _mapper = fixture.Mapper;
-        }
-
-        public void Dispose()
-        {
-            var client = new MongoClient(_databaseSettings.ConnectionString);
-            client.DropDatabase(_databaseSettings.DatabaseName);
-        }
+        private readonly ICouponRepository _repository = new FakeCouponRepository();
 
         [Fact]
         public void CreateCoupon_couponCreated()
         {
- //           var repository = new FakeCouponRepository(); //  new CouponRepository(_databaseSettings);
-
             var target = new CouponController(new CouponManager(_repository, _mapper));
 
             var expiration = DateTime.Now.ToUniversalTime().Date;
@@ -116,9 +97,29 @@ namespace ShoppingCartServiceTests.Controllers
 
             var actual = target.DeleteCoupon(coupon.Id);
             Assert.IsType<NoContentResult>(actual);
-            var couponFindResult = target.FindById(Invalid_ID);
+            var couponFindResult = target.FindById(coupon.Id);
 
             Assert.IsType<NotFoundResult>(couponFindResult.Result);
         }
+
+        class FakeCouponRepository : ICouponRepository
+        {
+            private Coupon _coupon;
+
+            public Coupon Create(Coupon coupon)
+            {
+                coupon.Id = "created-coupon";
+                _coupon = coupon;
+                return _coupon;
+            }
+
+            public void DeleteById(string id)
+            {
+                _coupon = null;
+            }
+
+            public Coupon FindById(string id) => _coupon;
+        }
+
     }
 }
