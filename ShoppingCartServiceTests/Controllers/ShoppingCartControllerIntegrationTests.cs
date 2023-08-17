@@ -1,59 +1,50 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+
 using AutoMapper;
+
+using Xunit;
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
-using MongoDB.Driver;
+
 using ShoppingCartService.BusinessLogic;
 using ShoppingCartService.BusinessLogic.Validation;
-using ShoppingCartService.Config;
 using ShoppingCartService.Controllers;
 using ShoppingCartService.Controllers.Models;
 using ShoppingCartService.DataAccess;
 using ShoppingCartService.DataAccess.Entities;
 using ShoppingCartService.Models;
+
 using ShoppingCartServiceTests.Builders;
-using ShoppingCartServiceTests.Fixtures;
-using Xunit;
+using ShoppingCartServiceTests.Fakes;
+
 using static ShoppingCartServiceTests.Builders.ItemBuilder;
 using static ShoppingCartServiceTests.Builders.AddressBuilder;
+using static ShoppingCartServiceTests.HelperExtensions;
 
 namespace ShoppingCartServiceTests.Controllers
 {
-    [Collection("Dockerized MongoDB collection")]
-    public class ShoppingCartControllerIntegrationTests : IDisposable
+    public class ShoppingCartControllerIntegrationTests
     {
-        private readonly ShoppingCartDatabaseSettings _databaseSettings;
-        private readonly IMapper _mapper;
+        private readonly IMapper _mapper = ConfigureMapper();
+        private readonly IShoppingCartRepository _repository = new FakeShoppingCartRepository();
 
-        public ShoppingCartControllerIntegrationTests(DockerMongoFixture fixture)
-        {
-            _databaseSettings = fixture.GetDatabaseSettings();
-
-            _mapper = fixture.Mapper;
-        }
-
-        public void Dispose()
-        {
-            var client = new MongoClient(_databaseSettings.ConnectionString);
-            client.DropDatabase(_databaseSettings.DatabaseName);
-        }
 
         [Fact]
         public void GetAll_HasOneCart_returnAllShoppingCartsInformation()
         {
-            var repository = new ShoppingCartRepository(_databaseSettings);
 
             var cart = new CartBuilder()
                 .WithId(null)
                 .WithCustomerId("1")
-                .WithItems(new List<Item> {CreateItem()})
+                .WithItems(new List<Item> { CreateItem() })
                 .Build();
-            repository.Create(cart);
+            _repository.Create(cart);
 
 
-            var target = CreateShoppingCartController(repository);
+            var target = CreateShoppingCartController(_repository);
 
             var actual = target.GetAll();
 
@@ -82,17 +73,15 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void FindById_HasOneCartWithSameId_returnAllShoppingCartsInformation()
         {
-            var repository = new ShoppingCartRepository(_databaseSettings);
-
             var cart = new CartBuilder()
                 .WithId(null)
                 .WithCustomerId("1")
-                .WithItems(new List<Item> {CreateItem()})
+                .WithItems(new List<Item> { CreateItem() })
                 .Build();
 
-            repository.Create(cart);
+            _repository.Create(cart);
 
-            var target = CreateShoppingCartController(repository);
+            var target = CreateShoppingCartController(_repository);
 
             var actual = target.FindById(cart.Id);
 
@@ -122,11 +111,9 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void FindById_ItemNotFound_returnNotFoundResult()
         {
-            var repository = new ShoppingCartRepository(_databaseSettings);
+            var target = CreateShoppingCartController(_repository);
 
-            var target = CreateShoppingCartController(repository);
-
-            var actual = target.FindById("507f191e810c19729de860ea");
+            var actual = target.FindById(FakeShoppingCartRepository.INVALID_ID);
 
             Assert.IsType<NotFoundResult>(actual.Result);
         }
@@ -134,11 +121,9 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void CalculateTotals_ShoppingCartNotFound_ReturnNotFound()
         {
-            var repository = new ShoppingCartRepository(_databaseSettings);
+            var target = CreateShoppingCartController(_repository);
 
-            var target = CreateShoppingCartController(repository);
-
-            var actual = target.CalculateTotals("507f191e810c19729de860ea");
+            var actual = target.CalculateTotals("");
 
             Assert.IsType<NotFoundResult>(actual.Result);
         }
@@ -146,15 +131,13 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void CalculateTotals_ShippingCartFound_ReturnTotals()
         {
-            var repository = new ShoppingCartRepository(_databaseSettings);
-
             var cart = new CartBuilder()
                 .WithId(null)
-                .WithItems(new List<Item> {CreateItem()})
+                .WithItems(new List<Item> { CreateItem() })
                 .Build();
-            repository.Create(cart);
+            _repository.Create(cart);
 
-            var target = CreateShoppingCartController(repository);
+            var target = CreateShoppingCartController(_repository);
 
             var actual = target.CalculateTotals(cart.Id);
 
@@ -164,9 +147,7 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void Create_ValidData_SaveShoppingCartToDB()
         {
-            var repository = new ShoppingCartRepository(_databaseSettings);
-
-            var target = CreateShoppingCartController(repository);
+            var target = CreateShoppingCartController(_repository);
 
             var result = target.Create(new CreateCartDto
             {
@@ -175,13 +156,13 @@ namespace ShoppingCartServiceTests.Controllers
                     Address = CreateAddress(),
                 },
 
-                Items = new[] {CreateItemDto()}
+                Items = new[] { CreateItemDto() }
             });
 
             Assert.IsType<CreatedAtRouteResult>(result.Result);
-            var cartId = ((CreatedAtRouteResult) result.Result).RouteValues["id"].ToString();
+            var cartId = ((CreatedAtRouteResult)result.Result).RouteValues["id"].ToString();
 
-            var value = repository.FindById(cartId);
+            var value = _repository.FindById(cartId);
 
             Assert.NotNull(value);
         }
@@ -189,9 +170,7 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void Create_DuplicateItem_ReturnBadRequestResult()
         {
-            var repository = new ShoppingCartRepository(_databaseSettings);
-
-            var target = CreateShoppingCartController(repository);
+            var target = CreateShoppingCartController(_repository);
 
             var itemDto = CreateItemDto();
             var result = target.Create(new CreateCartDto
@@ -201,7 +180,7 @@ namespace ShoppingCartServiceTests.Controllers
                     Address = CreateAddress(),
                 },
 
-                Items = new[] {itemDto, CreateItemDto(productId: itemDto.ProductId)}
+                Items = new[] { itemDto, CreateItemDto(productId: itemDto.ProductId) }
             });
 
             Assert.IsType<BadRequestResult>(result.Result);
@@ -222,9 +201,7 @@ namespace ShoppingCartServiceTests.Controllers
         [MemberData(nameof(InvalidAddresses))]
         public void Create_InValidAddress_ReturnBadRequestResult(Address address)
         {
-            var repository = new ShoppingCartRepository(_databaseSettings);
-
-            var target = CreateShoppingCartController(repository);
+            var target = CreateShoppingCartController(_repository);
 
             var result = target.Create(new CreateCartDto
             {
@@ -247,23 +224,28 @@ namespace ShoppingCartServiceTests.Controllers
                 .WithItems(new List<Item> { CreateItem() })
                 .Build();
 
-            var repository = new ShoppingCartRepository(_databaseSettings);
-            repository.Create(cart);
+            _repository.Create(cart);
 
-            var target = CreateShoppingCartController(repository);
+            var target = CreateShoppingCartController(_repository);
 
             var result = target.DeleteCart(cart.Id);
 
-            var value = repository.FindById(cart.Id);
+            var value = _repository.FindById(cart.Id);
 
             Assert.Null(value);
         }
 
-        private ShoppingCartController CreateShoppingCartController(ShoppingCartRepository repository)
+        private ShoppingCartController CreateShoppingCartController(IShoppingCartRepository repository)
         {
             return new(
-                new ShoppingCartManager(repository, new AddressValidator(), _mapper,
-                    new CheckOutEngine(new ShippingCalculator(), _mapper)), new NullLogger<ShoppingCartController>());
+                new ShoppingCartManager(
+                    repository,
+                    new AddressValidator(),
+                    _mapper,
+                    new CheckOutEngine(new ShippingCalculator(), _mapper),
+                    new CouponEngine(),
+                    new FakeCouponRepository()), 
+                new NullLogger<ShoppingCartController>());
         }
     }
 }

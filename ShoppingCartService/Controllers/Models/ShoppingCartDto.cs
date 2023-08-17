@@ -35,10 +35,18 @@ namespace ShoppingCartService.Controllers.Models
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Id, CustomerId, (int) CustomerType, (int) ShippingMethod, ShippingAddress, Items);
+            return HashCode.Combine(Id, CustomerId, (int)CustomerType, (int)ShippingMethod, ShippingAddress, Items);
         }
     }
 
-    public record CheckoutDto (ShoppingCartDto ShoppingCart, double ShippingCost, double CustomerDiscount,
-        double Total);
+    public record CheckoutDto(
+        ShoppingCartDto ShoppingCart,
+        double ShippingCost,
+        double CustomerDiscount,
+        double Total)
+    {
+        public double CouponDiscount { get; set; } = 0;
+
+        public double TotalAfterCoupon => Total - CouponDiscount;
+    }
 }

@@ -16,14 +16,18 @@ namespace ShoppingCartService.BusinessLogic
         private readonly ICheckOutEngine _checkOutEngine;
         private readonly IMapper _mapper;
         private readonly IShoppingCartRepository _shoppingCartRepository;
+        private readonly ICouponEngine _couponEngine;
+        private readonly ICouponRepository _couponRepository;
 
         public ShoppingCartManager(IShoppingCartRepository shoppingCartRepository, IAddressValidator addressValidator,
-            IMapper mapper, ICheckOutEngine checkOutEngine)
+            IMapper mapper, ICheckOutEngine checkOutEngine, ICouponEngine couponEngine, ICouponRepository couponRepository)
         {
             _shoppingCartRepository = shoppingCartRepository;
             _mapper = mapper;
             _checkOutEngine = checkOutEngine;
             _addressValidator = addressValidator;
+            _couponEngine = couponEngine;
+            _couponRepository = couponRepository;
         }
 
         public IEnumerable<ShoppingCartDto> GetAllShoppingCarts()
@@ -91,11 +95,16 @@ namespace ShoppingCartService.BusinessLogic
             _shoppingCartRepository.Update(cart.Id, cart);
         }
 
-        public CheckoutDto CalculateTotals(string cartId)
+        public CheckoutDto CalculateTotals(string cartId, string couponId = null)
         {
             var cart = GetCartFromDb(cartId);
 
-            return _checkOutEngine.CalculateTotals(cart);
+            var checkout = _checkOutEngine.CalculateTotals(cart);
+
+            var coupon = _couponRepository.FindById(couponId);
+            checkout.CouponDiscount = _couponEngine.CalculateDiscount(checkout, coupon);
+
+            return checkout;
         }
 
         private static Item FindProductInCart(string productId, Cart cart)
