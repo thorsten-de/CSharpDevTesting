@@ -8,7 +8,7 @@ using ShoppingCartService.Models;
 
 namespace ShoppingCartService.BusinessLogic
 {
-    public class CouponEngine
+    public class CouponEngine : ICouponEngine
     {
         private static readonly Dictionary<CouponType, CouponHandlerBase> CouponHandlers = new()
         {

@@ -238,8 +238,14 @@ namespace ShoppingCartServiceTests.Controllers
         private ShoppingCartController CreateShoppingCartController(IShoppingCartRepository repository)
         {
             return new(
-                new ShoppingCartManager(repository, new AddressValidator(), _mapper,
-                    new CheckOutEngine(new ShippingCalculator(), _mapper)), new NullLogger<ShoppingCartController>());
+                new ShoppingCartManager(
+                    repository,
+                    new AddressValidator(),
+                    _mapper,
+                    new CheckOutEngine(new ShippingCalculator(), _mapper),
+                    new CouponEngine(),
+                    new FakeCouponRepository()), 
+                new NullLogger<ShoppingCartController>());
         }
     }
 }
