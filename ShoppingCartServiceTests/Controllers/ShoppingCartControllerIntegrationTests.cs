@@ -1,35 +1,36 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+
 using AutoMapper;
+
+using Xunit;
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
-using MongoDB.Driver;
+
 using ShoppingCartService.BusinessLogic;
 using ShoppingCartService.BusinessLogic.Validation;
-using ShoppingCartService.Config;
 using ShoppingCartService.Controllers;
 using ShoppingCartService.Controllers.Models;
 using ShoppingCartService.DataAccess;
 using ShoppingCartService.DataAccess.Entities;
 using ShoppingCartService.Models;
+
 using ShoppingCartServiceTests.Builders;
-using ShoppingCartServiceTests.Fixtures;
-using Xunit;
+using ShoppingCartServiceTests.Fakes;
+
 using static ShoppingCartServiceTests.Builders.ItemBuilder;
 using static ShoppingCartServiceTests.Builders.AddressBuilder;
 using static ShoppingCartServiceTests.HelperExtensions;
 
 namespace ShoppingCartServiceTests.Controllers
 {
-    public class ShoppingCartControllerIntegrationTests 
+    public class ShoppingCartControllerIntegrationTests
     {
-        private readonly ShoppingCartDatabaseSettings _databaseSettings;
         private readonly IMapper _mapper = ConfigureMapper();
         private readonly IShoppingCartRepository _repository = new FakeShoppingCartRepository();
 
-        private const string INVALID_ID = "507f191e810c19729de860ea";
-        private const string VALID_ID = "0815-cart";
 
         [Fact]
         public void GetAll_HasOneCart_returnAllShoppingCartsInformation()
@@ -38,7 +39,7 @@ namespace ShoppingCartServiceTests.Controllers
             var cart = new CartBuilder()
                 .WithId(null)
                 .WithCustomerId("1")
-                .WithItems(new List<Item> {CreateItem()})
+                .WithItems(new List<Item> { CreateItem() })
                 .Build();
             _repository.Create(cart);
 
@@ -75,7 +76,7 @@ namespace ShoppingCartServiceTests.Controllers
             var cart = new CartBuilder()
                 .WithId(null)
                 .WithCustomerId("1")
-                .WithItems(new List<Item> {CreateItem()})
+                .WithItems(new List<Item> { CreateItem() })
                 .Build();
 
             _repository.Create(cart);
@@ -112,7 +113,7 @@ namespace ShoppingCartServiceTests.Controllers
         {
             var target = CreateShoppingCartController(_repository);
 
-            var actual = target.FindById(INVALID_ID);
+            var actual = target.FindById(FakeShoppingCartRepository.INVALID_ID);
 
             Assert.IsType<NotFoundResult>(actual.Result);
         }
@@ -132,7 +133,7 @@ namespace ShoppingCartServiceTests.Controllers
         {
             var cart = new CartBuilder()
                 .WithId(null)
-                .WithItems(new List<Item> {CreateItem()})
+                .WithItems(new List<Item> { CreateItem() })
                 .Build();
             _repository.Create(cart);
 
@@ -155,11 +156,11 @@ namespace ShoppingCartServiceTests.Controllers
                     Address = CreateAddress(),
                 },
 
-                Items = new[] {CreateItemDto()}
+                Items = new[] { CreateItemDto() }
             });
 
             Assert.IsType<CreatedAtRouteResult>(result.Result);
-            var cartId = ((CreatedAtRouteResult) result.Result).RouteValues["id"].ToString();
+            var cartId = ((CreatedAtRouteResult)result.Result).RouteValues["id"].ToString();
 
             var value = _repository.FindById(cartId);
 
@@ -179,7 +180,7 @@ namespace ShoppingCartServiceTests.Controllers
                     Address = CreateAddress(),
                 },
 
-                Items = new[] {itemDto, CreateItemDto(productId: itemDto.ProductId)}
+                Items = new[] { itemDto, CreateItemDto(productId: itemDto.ProductId) }
             });
 
             Assert.IsType<BadRequestResult>(result.Result);
@@ -239,41 +240,6 @@ namespace ShoppingCartServiceTests.Controllers
             return new(
                 new ShoppingCartManager(repository, new AddressValidator(), _mapper,
                     new CheckOutEngine(new ShippingCalculator(), _mapper)), new NullLogger<ShoppingCartController>());
-        }
-
-
-        private class FakeShoppingCartRepository : IShoppingCartRepository
-        {
-            private Cart _cart;
-            public Cart Create(Cart cart)
-            {
-                cart.Id = VALID_ID;
-                _cart = cart;
-                return _cart;
-            }
-
-            public IEnumerable<Cart> FindAll()
-            {
-                yield return _cart;
-            }
-
-            public Cart FindById(string id) => _cart;
-
-            public void Remove(Cart cart)
-            {
-                _cart = null;
-            }
-
-            public void Remove(string id)
-            {
-                _cart = null;
-            }
-
-
-            public void Update(string id, Cart cart)
-            {
-                _cart = cart;
-            }
         }
     }
 }

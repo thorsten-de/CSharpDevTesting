@@ -10,14 +10,15 @@ using ShoppingCartService.DataAccess;
 using ShoppingCartService.DataAccess.Entities;
 using ShoppingCartService.Models;
 
+using ShoppingCartServiceTests.Fakes;
+
 using static ShoppingCartServiceTests.HelperExtensions;
 
 namespace ShoppingCartServiceTests.Controllers
 {
-    public class CouponsControllerIntegrationTests 
+    public partial class CouponsControllerIntegrationTests 
     {
         private readonly IMapper _mapper = ConfigureMapper();
-        private const string Invalid_ID = "507f191e810c19729de860ea";
         private readonly ICouponRepository _repository = new FakeCouponRepository();
 
         [Fact]
@@ -77,7 +78,7 @@ namespace ShoppingCartServiceTests.Controllers
         {
             var target = new CouponController(new CouponManager(_repository, _mapper));
 
-            var actual = target.FindById(Invalid_ID);
+            var actual = target.FindById(FakeCouponRepository.Invalid_ID);
 
             Assert.IsType<NotFoundResult>(actual.Result);
         }
@@ -101,25 +102,5 @@ namespace ShoppingCartServiceTests.Controllers
 
             Assert.IsType<NotFoundResult>(couponFindResult.Result);
         }
-
-        class FakeCouponRepository : ICouponRepository
-        {
-            private Coupon _coupon;
-
-            public Coupon Create(Coupon coupon)
-            {
-                coupon.Id = "created-coupon";
-                _coupon = coupon;
-                return _coupon;
-            }
-
-            public void DeleteById(string id)
-            {
-                _coupon = null;
-            }
-
-            public Coupon FindById(string id) => _coupon;
-        }
-
     }
 }
