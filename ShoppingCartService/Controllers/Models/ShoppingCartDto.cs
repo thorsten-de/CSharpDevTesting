@@ -46,5 +46,7 @@ namespace ShoppingCartService.Controllers.Models
         double Total)
     {
         public double CouponDiscount { get; set; } = 0;
+
+        public double TotalAfterCoupon => Total - CouponDiscount;
     }
 }
