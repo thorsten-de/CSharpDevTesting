@@ -10,6 +10,8 @@ namespace ShoppingCartService.BusinessLogic
 {
     public class CouponEngine : ICouponEngine
     {
+        public virtual DateTime GetCurrentTime() => DateTime.Now;
+
         private static readonly Dictionary<CouponType, CouponHandlerBase> CouponHandlers = new()
         {
             {CouponType.Amount, new AmountCouponHandler()},
@@ -23,7 +25,7 @@ namespace ShoppingCartService.BusinessLogic
 
             if (coupon.Value < 0) throw new InvalidCouponException("Coupon amount cannot be negative");
 
-            if (coupon.Expiration < DateTime.Now)
+            if (coupon.Expiration < GetCurrentTime())
                 throw new CouponExpiredException("Cannot apply coupon - coupon expiration date has passed");
 
             return CouponHandlers[coupon.CouponType].CalculateAmount(checkoutDto, coupon);

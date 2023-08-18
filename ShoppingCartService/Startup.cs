@@ -36,6 +36,7 @@ namespace ShoppingCartService
             services.AddSingleton<ICouponRepository, CouponRepository>();
             services.AddSingleton<IAddressValidator, AddressValidator>();
             services.AddSingleton<IShippingCalculator, ShippingCalculator>();
+            services.AddSingleton<ICouponEngine, CouponEngine>();
             services.AddSingleton<ICheckOutEngine, CheckOutEngine>();
             services.AddSingleton<ShoppingCartManager>();
             services.AddSingleton<CouponManager>();

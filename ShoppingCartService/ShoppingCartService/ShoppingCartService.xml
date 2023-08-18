@@ -32,7 +32,7 @@
             </summary>
             <param name="id">Shopping cart id</param>
         </member>
-        <member name="M:ShoppingCartService.Controllers.ShoppingCartController.CalculateTotals(System.String)">
+        <member name="M:ShoppingCartService.Controllers.ShoppingCartController.CalculateTotals(System.String,System.String)">
             <summary>
                 Checkout shopping cart and calculate total cost
             </summary>
