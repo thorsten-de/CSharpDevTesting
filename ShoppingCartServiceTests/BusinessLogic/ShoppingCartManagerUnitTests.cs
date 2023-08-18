@@ -15,7 +15,7 @@ using Microsoft.AspNetCore.Authentication;
 
 namespace ShoppingCartServiceTests.BusinessLogic
 {
-    public class ShoppingCartManagerTests
+    public class ShoppingCartManagerUnitTests
     {
         private readonly IMapper _mapper = ConfigureMapper();
         private readonly IShoppingCartRepository _repository = new FakeShoppingCartRepository();
