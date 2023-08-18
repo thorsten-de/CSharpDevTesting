@@ -1,6 +1,9 @@
 ﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+
 using ShoppingCartService.BusinessLogic;
 using ShoppingCartService.BusinessLogic.Exceptions;
 using ShoppingCartService.Controllers.Models;
@@ -49,17 +52,26 @@ namespace ShoppingCartService.Controllers
         /// </summary>
         /// <param name="id">Shopping cart id</param>
         [HttpGet("checkout/{id:length(24)}")]
-        public ActionResult<CheckoutDto> CalculateTotals(string id)
+        public ActionResult<CheckoutDto> CalculateTotals(string id, [MaxLength(24)][MinLength(24)] string couponCode = null)
         {
             try
             {
-                return _shoppingCartManager.CalculateTotals(id);
+                return _shoppingCartManager.CalculateTotals(id, couponCode);
             }
             catch (ShoppingCartNotFoundException)
             {
                 _logger.LogError($"Shopping cart {id} not found");
-
                 return NotFound();
+            }
+            catch (InvalidCouponException ex)
+            {
+                _logger.LogError($"Coupon {couponCode} is invalid: {ex.Message}");
+                return BadRequest();
+            }
+            catch (CouponExpiredException ex)
+            {
+                _logger.LogError($"Coupon {couponCode} is expired: {ex.Message}");
+                return BadRequest();
             }
         }
 

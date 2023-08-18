@@ -22,6 +22,7 @@ using ShoppingCartServiceTests.Fakes;
 
 using static ShoppingCartServiceTests.Builders.ItemBuilder;
 using static ShoppingCartServiceTests.Builders.AddressBuilder;
+using static ShoppingCartServiceTests.Builders.CouponBuilder;
 using static ShoppingCartServiceTests.HelperExtensions;
 
 namespace ShoppingCartServiceTests.Controllers
@@ -30,6 +31,7 @@ namespace ShoppingCartServiceTests.Controllers
     {
         private readonly IMapper _mapper = ConfigureMapper();
         private readonly IShoppingCartRepository _repository = new FakeShoppingCartRepository();
+        private readonly ICouponRepository _couponRepository = new FakeCouponRepository();
 
 
         [Fact]
@@ -139,7 +141,7 @@ namespace ShoppingCartServiceTests.Controllers
 
             var target = CreateShoppingCartController(_repository);
 
-            var actual = target.CalculateTotals(cart.Id);
+            var actual = target.CalculateTotals(cart.Id, FakeCouponRepository.Valid_ID);
 
             Assert.NotEqual(0.0, actual.Value.Total);
         }
@@ -235,7 +237,38 @@ namespace ShoppingCartServiceTests.Controllers
             Assert.Null(value);
         }
 
-        private ShoppingCartController CreateShoppingCartController(IShoppingCartRepository repository)
+        [Fact]
+        public void CalculateTotals_WithInvalidCoupon_ReturnsBadRequest()
+        {
+            var cart = new CartBuilder()
+                .Build();
+            _repository.Create(cart);
+            _couponRepository.Create(CreateCoupon(value: -50));
+
+            var target = CreateShoppingCartController(_repository);
+
+            var result = target.CalculateTotals(FakeShoppingCartRepository.VALID_ID, FakeCouponRepository.Valid_ID);
+            
+            Assert.IsType<BadRequestResult>(result.Result);
+        }
+
+        [Fact]
+        public void CalculateTotals_WithExpiredCoupon_ReturnsBadRequest()
+        {
+            var cart = new CartBuilder()
+                .Build();
+            _repository.Create(cart);
+            _couponRepository.Create(CreateCoupon(expiration: new DateTime(2023,08,08)));
+
+            var target = CreateShoppingCartController(_repository, new FakeDateCouponEngine(new DateTime(2023, 08, 17)));
+
+            var result = target.CalculateTotals(FakeShoppingCartRepository.VALID_ID, FakeCouponRepository.Valid_ID);
+
+            Assert.IsType<BadRequestResult>(result.Result);
+        }
+
+
+        private ShoppingCartController CreateShoppingCartController(IShoppingCartRepository repository, ICouponEngine couponEngine = null)
         {
             return new(
                 new ShoppingCartManager(
@@ -243,9 +276,21 @@ namespace ShoppingCartServiceTests.Controllers
                     new AddressValidator(),
                     _mapper,
                     new CheckOutEngine(new ShippingCalculator(), _mapper),
-                    new CouponEngine(),
-                    new FakeCouponRepository()), 
+                    couponEngine ?? new CouponEngine(),
+                    _couponRepository),
                 new NullLogger<ShoppingCartController>());
+        }
+
+        class FakeDateCouponEngine: CouponEngine
+        {
+            private readonly DateTime _fakeNow;
+
+            public FakeDateCouponEngine(DateTime fakeNow)
+            {
+                _fakeNow = fakeNow;
+            }
+
+            public override DateTime GetCurrentTime() => _fakeNow;
         }
     }
 }
