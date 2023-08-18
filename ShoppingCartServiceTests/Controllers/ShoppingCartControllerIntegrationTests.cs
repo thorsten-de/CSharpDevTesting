@@ -30,7 +30,7 @@ namespace ShoppingCartServiceTests.Controllers
     public class ShoppingCartControllerIntegrationTests
     {
         private readonly IMapper _mapper = ConfigureMapper();
-        private readonly IShoppingCartRepository _repository = new FakeShoppingCartRepository();
+        private readonly FakeShoppingCartRepository _repository = new FakeShoppingCartRepository();
         private readonly ICouponRepository _couponRepository = new FakeCouponRepository();
 
 
@@ -265,6 +265,44 @@ namespace ShoppingCartServiceTests.Controllers
             var result = target.CalculateTotals(FakeShoppingCartRepository.VALID_ID, FakeCouponRepository.Valid_ID);
 
             Assert.IsType<BadRequestResult>(result.Result);
+        }
+
+        [Fact]
+        public void AddItemToCard_ValidCartAndItem_AddsItem()
+        {
+            var cart = new CartBuilder()
+                .WithCustomerId("1")
+                .Build();
+
+            _repository.Create(cart);
+
+            ShoppingCartController target = CreateShoppingCartController(_repository);
+            var newItem = CreateItemDto("added-prod");
+            
+            var result = target.AddItemToCart(FakeShoppingCartRepository.VALID_ID, newItem);
+
+            Assert.True(_repository.WasUpdateCalled);
+            Assert.NotEmpty(_repository.LastSavedCart.Items);
+        }
+
+        [Fact]
+        public void RemoveItemToCard_ValidCartWithItem_RemovesItem()
+        {
+            var cart = new CartBuilder()
+                .WithCustomerId("1")
+                .WithItems(new List<Item> { CreateItem(productId: "prod-1") })
+                .Build();
+
+            _repository.Create(cart);
+
+            ShoppingCartController target = CreateShoppingCartController(_repository);
+            var newItem = CreateItemDto("added-prod");
+
+            var result = target.RemoveItemFromCart(FakeShoppingCartRepository.VALID_ID, "prod-1");
+
+            Assert.True(_repository.WasUpdateCalled);
+            Assert.Empty(_repository.LastSavedCart.Items);
+
         }
 
 

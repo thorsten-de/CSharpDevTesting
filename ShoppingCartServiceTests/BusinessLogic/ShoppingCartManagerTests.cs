@@ -47,6 +47,7 @@ namespace ShoppingCartServiceTests.BusinessLogic
             Assert.Equal(100, result.TotalAfterCoupon);
         }
 
+
         private ShoppingCartManager CreateShoppingCartManager(CheckoutDto checkoutDto)
         {
             var cartManager = new ShoppingCartManager(_repository, _addressValidator, _mapper,
