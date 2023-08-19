@@ -13,6 +13,7 @@ using static ShoppingCartServiceTests.Builders.CheckOutDtoBuilder;
 using static ShoppingCartServiceTests.Builders.CouponBuilder;
 using Microsoft.AspNetCore.Authentication;
 using Moq;
+using ShoppingCartService.Models;
 
 namespace ShoppingCartServiceTests.BusinessLogic
 {
@@ -21,7 +22,6 @@ namespace ShoppingCartServiceTests.BusinessLogic
         private readonly IMapper _mapper = ConfigureMapper();
         private readonly IShoppingCartRepository _repository = new FakeShoppingCartRepository();
         private readonly ICouponRepository _couponRepository = new FakeCouponRepository();
-        private readonly IAddressValidator _addressValidator = new FakeAddressValidator();
 
         [Fact]
         public void CalculateTotals_IncludeCouponWithCart()
@@ -61,7 +61,13 @@ namespace ShoppingCartServiceTests.BusinessLogic
 
         private ShoppingCartManager CreateShoppingCartManager(ICheckOutEngine checkOutEngine)
         {
-            var cartManager = new ShoppingCartManager(_repository, _addressValidator, _mapper,
+            var mockAddressValidator = new Mock<IAddressValidator>();
+            mockAddressValidator
+                .Setup(v => v.IsValid(It.IsAny<Address>())).Returns(true);
+
+            var cartManager = new ShoppingCartManager(_repository, 
+                mockAddressValidator.Object,
+                _mapper,
                 checkOutEngine,
                 new CouponEngine(),
                 _couponRepository);
