@@ -8,7 +8,13 @@ namespace ShoppingCartServiceTests.Fakes
     {
         public const string INVALID_ID = "507f191e810c19729de860ea";
         public const string VALID_ID = "0815-cart";
+
         private Cart _cart;
+
+
+        public Cart LastSavedCart { get; set; }
+        public bool WasUpdateCalled => LastSavedCart != null;
+
         public Cart Create(Cart cart)
         {
             cart.Id = VALID_ID;
@@ -36,7 +42,7 @@ namespace ShoppingCartServiceTests.Fakes
 
         public void Update(string id, Cart cart)
         {
-            _cart = cart;
+            LastSavedCart = cart;
         }
     }
 }

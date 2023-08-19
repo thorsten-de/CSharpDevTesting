@@ -15,7 +15,7 @@ using Microsoft.AspNetCore.Authentication;
 
 namespace ShoppingCartServiceTests.BusinessLogic
 {
-    public class ShoppingCartManagerTests
+    public class ShoppingCartManagerUnitTests
     {
         private readonly IMapper _mapper = ConfigureMapper();
         private readonly IShoppingCartRepository _repository = new FakeShoppingCartRepository();
@@ -46,6 +46,7 @@ namespace ShoppingCartServiceTests.BusinessLogic
             Assert.Equal(0, result.CouponDiscount);
             Assert.Equal(100, result.TotalAfterCoupon);
         }
+
 
         private ShoppingCartManager CreateShoppingCartManager(CheckoutDto checkoutDto)
         {
