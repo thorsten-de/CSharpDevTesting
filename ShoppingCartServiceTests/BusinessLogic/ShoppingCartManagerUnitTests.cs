@@ -12,6 +12,7 @@ using static ShoppingCartServiceTests.HelperExtensions;
 using static ShoppingCartServiceTests.Builders.CheckOutDtoBuilder;
 using static ShoppingCartServiceTests.Builders.CouponBuilder;
 using Microsoft.AspNetCore.Authentication;
+using Moq;
 
 namespace ShoppingCartServiceTests.BusinessLogic
 {
@@ -25,7 +26,12 @@ namespace ShoppingCartServiceTests.BusinessLogic
         [Fact]
         public void CalculateTotals_IncludeCouponWithCart()
         {
-            ShoppingCartManager target = CreateShoppingCartManager(CreateCheckOutDto(total: 100));
+            var fakeCheckoutEngine = new Mock<ICheckOutEngine>();
+            fakeCheckoutEngine.Setup(
+                e => e.CalculateTotals(It.IsAny<Cart>()))
+                      .Returns(CreateCheckOutDto(total: 100));
+
+            ShoppingCartManager target = CreateShoppingCartManager(fakeCheckoutEngine.Object);
             var coupon = _couponRepository.Create(CreateCoupon(value: 15));
 
             var result = target.CalculateTotals(FakeShoppingCartRepository.VALID_ID, coupon.Id);
@@ -38,7 +44,12 @@ namespace ShoppingCartServiceTests.BusinessLogic
         [Fact]
         public void CalculateTotals_WithoutCouponCode_HasNoDiscount()
         {
-            ShoppingCartManager target = CreateShoppingCartManager(CreateCheckOutDto(total: 100));
+            var fakeCheckoutEngine = new Mock<ICheckOutEngine>();
+            fakeCheckoutEngine.Setup(
+                e => e.CalculateTotals(It.IsAny<Cart>()))
+                      .Returns(CreateCheckOutDto(total: 100));
+
+            ShoppingCartManager target = CreateShoppingCartManager(fakeCheckoutEngine.Object);
 
             var result = target.CalculateTotals(FakeShoppingCartRepository.VALID_ID);
             
@@ -48,10 +59,10 @@ namespace ShoppingCartServiceTests.BusinessLogic
         }
 
 
-        private ShoppingCartManager CreateShoppingCartManager(CheckoutDto checkoutDto)
+        private ShoppingCartManager CreateShoppingCartManager(ICheckOutEngine checkOutEngine)
         {
             var cartManager = new ShoppingCartManager(_repository, _addressValidator, _mapper,
-                new FakeCheckoutEngine(checkoutDto),
+                checkOutEngine,
                 new CouponEngine(),
                 _couponRepository);
             
