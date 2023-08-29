@@ -16,30 +16,31 @@ using ShoppingCartServiceTests.Builders;
 
 namespace ShoppingCartServiceTests.BusinessLogic
 {
-    public class ShoppingCartManagerUnitTests
+    public class ShoppingCartManagerUnitTests : TestBase
     {
-        private readonly IMapper _mapper = ConfigureMapper();
-        private readonly Mock<IShoppingCartRepository> _fakeCartRepository = new Mock<IShoppingCartRepository>();
-        private readonly Mock<ICouponRepository> _fakeCouponRepository = new Mock<ICouponRepository>();
 
 
         [Fact]
         public void CalculateTotals_IncludeCouponWithCart()
         {
-            _fakeCartRepository
+            var fakeCartRepository = _mocker.GetMock<IShoppingCartRepository>();
+            fakeCartRepository
                 .Setup(r => r.FindById("cart-1"))
                 .Returns(new CartBuilder().Build());
 
-            _fakeCouponRepository
+            var fakeCouponRepository = _mocker.GetMock<ICouponRepository>();
+            fakeCouponRepository
                 .Setup(r => r.FindById("coupon-1"))
                 .Returns(CreateCoupon(value: 15));
 
-            var fakeCheckoutEngine = new Mock<ICheckOutEngine>();
+            var fakeCheckoutEngine = _mocker.GetMock<ICheckOutEngine>();
             fakeCheckoutEngine.Setup(
                 e => e.CalculateTotals(It.IsAny<Cart>()))
                       .Returns(CreateCheckOutDto(total: 100));
 
-            ShoppingCartManager target = CreateShoppingCartManager(fakeCheckoutEngine.Object);
+            _mocker.Use<ICouponEngine>(new CouponEngine());
+
+            ShoppingCartManager target = _mocker.CreateInstance<ShoppingCartManager>();
 
             var result = target.CalculateTotals("cart-1", "coupon-1");
 
@@ -51,41 +52,25 @@ namespace ShoppingCartServiceTests.BusinessLogic
         [Fact]
         public void CalculateTotals_WithoutCouponCode_HasNoDiscount()
         {
-            _fakeCartRepository
+            var fakeCartRepository = _mocker.GetMock<IShoppingCartRepository>();
+            fakeCartRepository
                 .Setup(r => r.FindById("cart-1"))
                 .Returns(new CartBuilder().Build());
 
-            var fakeCheckoutEngine = new Mock<ICheckOutEngine>();
+            var fakeCheckoutEngine = _mocker.GetMock<ICheckOutEngine>();
             fakeCheckoutEngine.Setup(
                 e => e.CalculateTotals(It.IsAny<Cart>()))
                       .Returns(CreateCheckOutDto(total: 100));
+            
+            _mocker.Use<ICouponEngine>(new CouponEngine());
 
-            ShoppingCartManager target = CreateShoppingCartManager(fakeCheckoutEngine.Object);
+            ShoppingCartManager target = _mocker.CreateInstance<ShoppingCartManager>();
 
             var result = target.CalculateTotals("cart-1");
-            
+
             Assert.Equal(100, result.Total);
             Assert.Equal(0, result.CouponDiscount);
             Assert.Equal(100, result.TotalAfterCoupon);
         }
-
-
-        private ShoppingCartManager CreateShoppingCartManager(ICheckOutEngine checkOutEngine)
-        {
-            var mockAddressValidator = new Mock<IAddressValidator>();
-            mockAddressValidator
-                .Setup(v => v.IsValid(It.IsAny<Address>())).Returns(true);
-
-            var cartManager = new ShoppingCartManager(_fakeCartRepository.Object, 
-                mockAddressValidator.Object,
-                _mapper,
-                checkOutEngine,
-                new CouponEngine(),
-                _fakeCouponRepository.Object);
-            
-            cartManager.Create(new CreateCartDto { });
-            return cartManager;
-        }
     }
-
 }
