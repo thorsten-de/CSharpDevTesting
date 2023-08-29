@@ -7,23 +7,19 @@ using ShoppingCartService.Models;
 using ShoppingCartServiceTests.Builders;
 using Xunit;
 
+using static ShoppingCartServiceTests.HelperExtensions;
 using static ShoppingCartServiceTests.Builders.AddressBuilder;
 using static ShoppingCartServiceTests.Builders.ItemBuilder;
 
 namespace ShoppingCartServiceTests.BusinessLogic
 {
-    public class CheckOutEngineUnitTests
+    public class CheckOutEngineUnitTests : TestBase
     {
-        private readonly IMapper _mapper;
-
         public CheckOutEngineUnitTests()
         {
             // Ideally do not write any test related logic here
             // Only infrastructure and environment setup
-
-            var config = new MapperConfiguration(cfg => cfg.AddProfile(new MappingProfile()));
-
-            _mapper = config.CreateMapper();
+            _mocker.Use<IShippingCalculator>(new ShippingCalculator());
         }
 
         [Theory]
@@ -33,7 +29,7 @@ namespace ShoppingCartServiceTests.BusinessLogic
         {
             var address = CreateAddress();
 
-            var target = new CheckOutEngine(new ShippingCalculator(address), _mapper);
+            var target = _mocker.CreateInstance<CheckOutEngine>();
 
             var cart = new CartBuilder()
                 .WithCustomerType(customerType)
@@ -57,7 +53,7 @@ namespace ShoppingCartServiceTests.BusinessLogic
             var originAddress = CreateAddress(city: "city 1");
             var destinationAddress = CreateAddress(city: "city 2");
 
-            var target = new CheckOutEngine(new ShippingCalculator(originAddress), _mapper);
+            var target = _mocker.CreateInstance<CheckOutEngine>();
             
             var cart = new CartBuilder()
                 .WithShippingAddress(destinationAddress)
@@ -79,7 +75,7 @@ namespace ShoppingCartServiceTests.BusinessLogic
             var originAddress = CreateAddress(city: "city 1");
             var destinationAddress = CreateAddress(city: "city 2");
 
-            var target = new CheckOutEngine(new ShippingCalculator(originAddress), _mapper);
+            var target = _mocker.CreateInstance<CheckOutEngine>();
 
             var cart = new CartBuilder()
                 .WithShippingAddress(destinationAddress)
@@ -103,7 +99,7 @@ namespace ShoppingCartServiceTests.BusinessLogic
             var originAddress = CreateAddress(city: "city 1");
             var destinationAddress = CreateAddress(city: "city 2");
 
-            var target = new CheckOutEngine(new ShippingCalculator(originAddress), _mapper);
+            var target = _mocker.CreateInstance<CheckOutEngine>();
 
             var cart = new CartBuilder()
                 .WithCustomerType(CustomerType.Premium)
