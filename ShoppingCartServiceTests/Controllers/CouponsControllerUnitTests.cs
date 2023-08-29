@@ -1,5 +1,4 @@
 ﻿using System;
-using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
 using Xunit;
 
@@ -10,19 +9,17 @@ using ShoppingCartService.DataAccess;
 using ShoppingCartService.DataAccess.Entities;
 using ShoppingCartService.Models;
 
-using static ShoppingCartServiceTests.HelperExtensions;
 using Moq;
 
 namespace ShoppingCartServiceTests.Controllers
 {
-    public partial class CouponsControllerUnitTests 
+    public partial class CouponsControllerUnitTests : TestBase
     {
-        private readonly IMapper _mapper = ConfigureMapper();
 
         [Fact]
         public void CreateCoupon_couponCreated()
         {
-            var mockRepo = new Mock<ICouponRepository>();
+            var mockRepo = _mocker.GetMock<ICouponRepository>();
             mockRepo
                 .Setup(r => r.Create(It.IsAny<Coupon>()))
                 .Callback<Coupon>(coupon =>
@@ -30,7 +27,7 @@ namespace ShoppingCartServiceTests.Controllers
                     coupon.Id = "coupon-id";
                 });
 
-            var target = new CouponController(new CouponManager(mockRepo.Object, _mapper));
+            var target = _mocker.CreateInstance<CouponController>();
 
             var expiration = DateTime.Now.ToUniversalTime().Date;
             var createCouponDto = new CreateCouponDto(
@@ -57,12 +54,12 @@ namespace ShoppingCartServiceTests.Controllers
                 Value = 10
             };
 
-            var stubCouponRepository = new Mock<ICouponRepository>();
+            var stubCouponRepository = _mocker.GetMock<ICouponRepository>();
             stubCouponRepository
                 .Setup(r => r.FindById("coupon-id"))
                 .Returns(coupon);
 
-            var target = new CouponController(new CouponManager(stubCouponRepository.Object, _mapper));
+            var target = _mocker.CreateInstance<CouponController>();
 
             var actual = target.FindById("coupon-id");
 
@@ -73,12 +70,12 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void FindById_notFound_returnNotFoundResult()
         {
-            var stubCouponRepository = new Mock<ICouponRepository>();
+            var stubCouponRepository = _mocker.GetMock<ICouponRepository>();
             stubCouponRepository
                 .Setup(r => r.FindById("coupon-unkwnon"))
                 .Returns<Coupon>(null);
 
-            var target = new CouponController(new CouponManager(stubCouponRepository.Object, _mapper));
+            var target = _mocker.CreateInstance<CouponController>();
 
             var actual = target.FindById("coupon-unknown");
 
@@ -88,9 +85,9 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void Delete_ReturnNoConentAndDeleteItem()
         {
-            var mockRepository = new Mock<ICouponRepository>();
+            var mockRepository = _mocker.GetMock<ICouponRepository>();
 
-            var target = new CouponController(new CouponManager(mockRepository.Object, _mapper));
+            var target = _mocker.CreateInstance<CouponController>();
 
             var actual = target.DeleteCoupon("coupon-1");
             
