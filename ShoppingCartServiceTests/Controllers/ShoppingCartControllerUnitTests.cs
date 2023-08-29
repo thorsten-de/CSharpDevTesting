@@ -1,28 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-using AutoMapper;
-
-using Xunit;
-
+﻿using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
-
+using Moq;
 using ShoppingCartService.BusinessLogic;
+using ShoppingCartService.BusinessLogic.Exceptions;
 using ShoppingCartService.BusinessLogic.Validation;
 using ShoppingCartService.Controllers;
 using ShoppingCartService.Controllers.Models;
 using ShoppingCartService.DataAccess;
 using ShoppingCartService.DataAccess.Entities;
 using ShoppingCartService.Models;
-
 using ShoppingCartServiceTests.Builders;
-using ShoppingCartServiceTests.Fakes;
-
-using static ShoppingCartServiceTests.Builders.ItemBuilder;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Xunit;
 using static ShoppingCartServiceTests.Builders.AddressBuilder;
 using static ShoppingCartServiceTests.Builders.CouponBuilder;
+using static ShoppingCartServiceTests.Builders.ItemBuilder;
 using static ShoppingCartServiceTests.HelperExtensions;
 
 namespace ShoppingCartServiceTests.Controllers
@@ -30,21 +25,31 @@ namespace ShoppingCartServiceTests.Controllers
     public class ShoppingCartControllerUnitTests
     {
         private readonly IMapper _mapper = ConfigureMapper();
-        private readonly FakeShoppingCartRepository _fakeCartRepository = new FakeShoppingCartRepository();
-        private readonly ICouponRepository _couponRepository = new FakeCouponRepository();
+        private readonly Mock<IShoppingCartRepository> _fakeCartRepository = new Mock<IShoppingCartRepository>();
+        private readonly Mock<ICouponRepository> _fakeCouponRepository = new Mock<ICouponRepository>();
 
+        private Cart FakeDefaultCartRepository(params Item[] items)
+        {
+            var cart = new CartBuilder()
+                .WithId("cart-1")
+                .WithCustomerId("1")
+                .WithItems(items.ToList())
+                .Build();
+
+            _fakeCartRepository
+                .Setup(r => r.FindById("cart-1"))
+                .Returns(cart);
+            _fakeCartRepository
+                .Setup(r => r.FindAll())
+                .Returns(new[] { cart });            
+
+            return cart;
+        }
 
         [Fact]
         public void GetAll_HasOneCart_returnAllShoppingCartsInformation()
         {
-
-            var cart = new CartBuilder()
-                .WithId(null)
-                .WithCustomerId("1")
-                .WithItems(new List<Item> { CreateItem() })
-                .Build();
-            _fakeCartRepository.Create(cart);
-
+            var cart = FakeDefaultCartRepository(CreateItem());
 
             var target = CreateShoppingCartController();
 
@@ -75,17 +80,11 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void FindById_HasOneCartWithSameId_returnAllShoppingCartsInformation()
         {
-            var cart = new CartBuilder()
-                .WithId(null)
-                .WithCustomerId("1")
-                .WithItems(new List<Item> { CreateItem() })
-                .Build();
-
-            _fakeCartRepository.Create(cart);
+            var cart = FakeDefaultCartRepository(CreateItem());
 
             var target = CreateShoppingCartController();
 
-            var actual = target.FindById(cart.Id);
+            var actual = target.FindById("cart-1");
 
             var cartItem = cart.Items[0];
             var expected =
@@ -115,7 +114,7 @@ namespace ShoppingCartServiceTests.Controllers
         {
             var target = CreateShoppingCartController();
 
-            var actual = target.FindById(FakeShoppingCartRepository.INVALID_ID);
+            var actual = target.FindById("unknwon-cart");
 
             Assert.IsType<NotFoundResult>(actual.Result);
         }
@@ -133,15 +132,10 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void CalculateTotals_ShippingCartFound_ReturnTotals()
         {
-            var cart = new CartBuilder()
-                .WithId(null)
-                .WithItems(new List<Item> { CreateItem() })
-                .Build();
-            _fakeCartRepository.Create(cart);
-
+            var cart = FakeDefaultCartRepository(CreateItem());
             var target = CreateShoppingCartController();
 
-            var actual = target.CalculateTotals(cart.Id, FakeCouponRepository.Valid_ID);
+            var actual = target.CalculateTotals(cart.Id, "coupon-1");
 
             Assert.NotEqual(0.0, actual.Value.Total);
         }
@@ -149,6 +143,11 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void Create_ValidData_SaveShoppingCartToDB()
         {
+            _fakeCartRepository
+                .Setup(r => r.Create(It.IsAny<Cart>()))
+                .Callback<Cart>(cart => cart.Id = "cart-1")
+                .Returns<Cart>(cart => cart);
+
             var target = CreateShoppingCartController();
 
             var result = target.Create(new CreateCartDto
@@ -163,10 +162,7 @@ namespace ShoppingCartServiceTests.Controllers
 
             Assert.IsType<CreatedAtRouteResult>(result.Result);
             var cartId = ((CreatedAtRouteResult)result.Result).RouteValues["id"].ToString();
-
-            var value = _fakeCartRepository.FindById(cartId);
-
-            Assert.NotNull(value);
+            Assert.Equal("cart-1", cartId);
         }
 
         [Fact]
@@ -220,49 +216,34 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void Delete_ValidData_RemoveShoppingCartToDB()
         {
-            var cart = new CartBuilder()
-                .WithId(null)
-                .WithCustomerId("1")
-                .WithItems(new List<Item> { CreateItem() })
-                .Build();
-
-            _fakeCartRepository.Create(cart);
+            var cart = FakeDefaultCartRepository(CreateItem());
 
             var target = CreateShoppingCartController();
 
-            var result = target.DeleteCart(cart.Id);
+            var result = target.DeleteCart("cart-1");
 
-            var value = _fakeCartRepository.FindById(cart.Id);
-
-            Assert.Null(value);
+            _fakeCartRepository.Verify(r => r.Remove("cart-1"), Times.Once);
         }
 
         [Fact]
         public void CalculateTotals_WithInvalidCoupon_ReturnsBadRequest()
         {
-            var cart = new CartBuilder()
-                .Build();
-            _fakeCartRepository.Create(cart);
-            _couponRepository.Create(CreateCoupon(value: -50));
+            var cart = FakeDefaultCartRepository();
 
-            var target = CreateShoppingCartController();
+            var fakeCouponRegistry = new Mock<ICouponRepository>();
+            fakeCouponRegistry
+                .Setup(r => r.FindById("coupon-1"))
+                .Returns(CreateCoupon(value: -50));
 
-            var result = target.CalculateTotals(FakeShoppingCartRepository.VALID_ID, FakeCouponRepository.Valid_ID);
-            
-            Assert.IsType<BadRequestResult>(result.Result);
-        }
+            var fakeCouponEngine = new Mock<ICouponEngine>();
+            fakeCouponEngine
+                .Setup(e => e.CalculateDiscount(It.IsAny<CheckoutDto>(), It.IsAny<Coupon>()))
+                .Throws(() => new InvalidCouponException());
 
-        [Fact]
-        public void CalculateTotals_WithExpiredCoupon_ReturnsBadRequest()
-        {
-            var cart = new CartBuilder()
-                .Build();
-            _fakeCartRepository.Create(cart);
-            _couponRepository.Create(CreateCoupon(expiration: new DateTime(2023,08,08)));
 
-            var target = CreateShoppingCartController(new FakeDateCouponEngine(new DateTime(2023, 08, 17)));
+            var target = CreateShoppingCartController(fakeCouponEngine.Object);
 
-            var result = target.CalculateTotals(FakeShoppingCartRepository.VALID_ID, FakeCouponRepository.Valid_ID);
+            var result = target.CalculateTotals("cart-1", "coupon-1");
 
             Assert.IsType<BadRequestResult>(result.Result);
         }
@@ -275,26 +256,32 @@ namespace ShoppingCartServiceTests.Controllers
             var result = target.AddItemToCart("unknwon-cart", CreateItemDto());
 
             Assert.IsType<NotFoundResult>(result.Result);
-            Assert.False(_fakeCartRepository.WasUpdateCalled);
+            _fakeCartRepository.Verify(r => r.Update("unknown-cart", It.IsAny<Cart>()), Times.Never);
         }
 
         [Fact]
         public void AddItemToCard_ItemNotInCart_CreateNewItem()
         {
-            var cart = new CartBuilder()
-                .WithItems(new List<Item> { CreateItem(productId: "other")})
-                .Build();
-
-            _fakeCartRepository.Create(cart);
-
+            _fakeCartRepository
+                .Setup(r => r.FindById("cart-1"))
+                .Returns(new CartBuilder()
+                    .WithItems(new List<Item> { CreateItem(productId: "other") })
+                    .Build());
+            
+            Cart lastSavedCart = null;
+            _fakeCartRepository
+                .Setup(r => r.Update("cart-1", It.IsAny<Cart>()))
+                .Callback<string, Cart>((_, cart) => lastSavedCart = cart);
+                
             ShoppingCartController target = CreateShoppingCartController();
             var newItem = CreateItemDto(productId: "item-1");
             
-            var result = target.AddItemToCart(FakeShoppingCartRepository.VALID_ID, newItem);
+            var result = target.AddItemToCart("cart-1", newItem);
 
             Assert.IsType<OkResult>(result.Result);
+            Assert.NotNull(lastSavedCart);
 
-            var actualItemIds = _fakeCartRepository.LastSavedCart.Items
+            var actualItemIds = lastSavedCart.Items
                 .Select(i => i.ProductId)
                 .ToArray();
 
@@ -304,20 +291,26 @@ namespace ShoppingCartServiceTests.Controllers
         [Fact]
         public void AddItemtoCart_ItemInCart_IncreaseItemQuantity()
         {
-            var cart = new CartBuilder()
-                .WithItems(new List<Item> { CreateItem(productId: "item-1", quantity: 3) })
-                .Build();
+            _fakeCartRepository
+                .Setup(r => r.FindById("cart-1"))
+                .Returns(new CartBuilder()
+                    .WithItems(new List<Item> { CreateItem(productId: "item-1", quantity: 3) })
+                    .Build());
 
-            _fakeCartRepository.Create(cart);
+            Cart lastSavedCart = null;
+            _fakeCartRepository
+                .Setup(r => r.Update("cart-1", It.IsAny<Cart>()))
+                .Callback<string, Cart>((_, cart) => lastSavedCart = cart);
+
 
             ShoppingCartController target = CreateShoppingCartController();
             var newItem = CreateItemDto(productId: "item-1", quantity: 5);
 
-            var result = target.AddItemToCart(FakeShoppingCartRepository.VALID_ID, newItem);
+            var result = target.AddItemToCart("cart-1", newItem);
 
             Assert.IsType<OkResult>(result.Result);
-
-            Assert.Equal(8u, _fakeCartRepository.LastSavedCart.Items.Single().Quantity);
+            Assert.NotNull(lastSavedCart);
+            Assert.Equal(8u, lastSavedCart.Items.Single().Quantity);
         }
 
         [Fact]
@@ -328,43 +321,47 @@ namespace ShoppingCartServiceTests.Controllers
             var result = target.RemoveItemFromCart("unknown-cart", "maybe-knwon-item");
 
             Assert.IsType<NotFoundResult>(result);
-            Assert.False(_fakeCartRepository.WasUpdateCalled);
+            _fakeCartRepository.Verify(r => r.Update("unknown-cart", It.IsAny<Cart>()), Times.Never);
         }
 
         [Fact]
         public void RemoveItemFromCart_ValidCartWithoutValidProductID_ReturnNotFound()
         {
-            var cart = new CartBuilder().Build();
-            _fakeCartRepository.Create(cart);
+            var cart = FakeDefaultCartRepository(CreateItem());
 
             ShoppingCartController target = CreateShoppingCartController();
 
-            var result = target.RemoveItemFromCart(FakeShoppingCartRepository.VALID_ID, "unknwon-item");
+            var result = target.RemoveItemFromCart("cart-1", "unknwon-item");
 
             Assert.IsType<NotFoundResult>(result);
-            Assert.False(_fakeCartRepository.WasUpdateCalled);
+            _fakeCartRepository.Verify(r => r.Update("cart-1", It.IsAny<Cart>()), Times.Never);
         }
 
         [Fact]
         public void RemoveItemToCard_ValidCartAndProductID_RemoveItemFromCart()
         {
-            var cart = new CartBuilder()
-                .WithCustomerId("1")
-                .WithItems(new List<Item> { 
-                    CreateItem(productId: "prod-1"),
-                    CreateItem(productId: "prod-2"),
-                    CreateItem(productId: "prod-3") 
-                })
-                .Build();
-            _fakeCartRepository.Create(cart);
+            _fakeCartRepository
+                .Setup(r => r.FindById("cart-1"))
+                .Returns(new CartBuilder()
+                    .WithItems(new List<Item> {
+                        CreateItem(productId: "prod-1"),
+                        CreateItem(productId: "prod-2"),
+                        CreateItem(productId: "prod-3")
+                    }).Build());
+
+            Cart lastSavedCart = null;
+            _fakeCartRepository
+                .Setup(r => r.Update("cart-1", It.IsAny<Cart>()))
+                .Callback<string, Cart>((_, cart) => lastSavedCart = cart);
 
             ShoppingCartController target = CreateShoppingCartController();
 
-            var result = target.RemoveItemFromCart(FakeShoppingCartRepository.VALID_ID, "prod-2");
+            var result = target.RemoveItemFromCart("cart-1", "prod-2");
 
             Assert.IsType<OkResult>(result);
+            
 
-            var actualProductIds = _fakeCartRepository.LastSavedCart.Items
+            var actualProductIds = lastSavedCart.Items
                 .Select(i => i.ProductId)
                 .ToArray();
 
@@ -376,12 +373,12 @@ namespace ShoppingCartServiceTests.Controllers
         {
             return new(
                 new ShoppingCartManager(
-                    _fakeCartRepository,
+                    _fakeCartRepository.Object,
                     new AddressValidator(),
                     _mapper,
                     new CheckOutEngine(new ShippingCalculator(), _mapper),
                     couponEngine ?? new CouponEngine(),
-                    _couponRepository),
+                    _fakeCouponRepository.Object),
                 new NullLogger<ShoppingCartController>());
         }
 

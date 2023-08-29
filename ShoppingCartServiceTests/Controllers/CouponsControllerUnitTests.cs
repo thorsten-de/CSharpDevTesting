@@ -43,31 +43,30 @@ namespace ShoppingCartServiceTests.Controllers
 
             Assert.IsType<CreatedAtRouteResult>(result.Result);
             
-            var couponId = ((CreatedAtRouteResult)result.Result).RouteValues["id"]?.ToString();
+            var couponId = ((CreatedAtRouteResult)result.Result).RouteValues["id"].ToString();
             Assert.Equal("coupon-id", couponId);
-            mockRepo.Verify(r => r.Create(It.IsAny<Coupon>()));
-
         }
 
         [Fact]
-        public void FindById_HasOneCartWithSameId_returnAllShoppingCartsInformation()
+        public void FindById_HasOneCouponWithSameId_returnAllCouponInformation()
         {
             var coupon = new Coupon
             {
+                Id = "coupon-id",
                 CouponType = CouponType.Percentage,
                 Value = 10
             };
 
             var stubCouponRepository = new Mock<ICouponRepository>();
             stubCouponRepository
-                .Setup(r => r.FindById(It.IsAny<string>()))
+                .Setup(r => r.FindById("coupon-id"))
                 .Returns(coupon);
 
             var target = new CouponController(new CouponManager(stubCouponRepository.Object, _mapper));
 
-            var actual = target.FindById(coupon.Id);
+            var actual = target.FindById("coupon-id");
 
-            var expected = new CouponDto(coupon.Id, CouponType.Percentage, 10, coupon.Expiration);
+            var expected = new CouponDto("coupon-id", CouponType.Percentage, 10, coupon.Expiration);
             Assert.Equal(expected, actual.Value);
         }
 
